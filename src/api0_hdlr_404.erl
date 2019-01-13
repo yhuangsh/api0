@@ -1,4 +1,4 @@
--module(web0_hdlr_404).
+-module(api0_hdlr_404).
 
 -export([init/2]).
 

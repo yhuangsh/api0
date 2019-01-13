@@ -1,4 +1,4 @@
--module(web0_hdlr_cmd_version).
+-module(api0_hdlr_cmd_version).
 
 -export([init/2,
          allowed_method/2,
