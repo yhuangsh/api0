@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: api0
+spec:
+  serviceName: "api0"
+  replicas: 3
+  selector:
+    matchLabels:
+      app: api0
+  template:
+    metadata:
+      labels:
+        app: api0
+    spec:
+      terminationGracePeriodSeconds: 10
+      containers:
+      - name: api0
+        image: yhuangsh/api0-dev-build:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8000
+          name: api0
+        livenessProbe:
+          httpGet:
+            path: /api0/probes/live
+            port: 8000
+            httpHeaders:
+            - name: X-api0-Probe-Header
+              value: live
+          initialDelaySeconds: 3
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /api0/probes/ready
+            port: 8000
+            httpHeaders:
+            - name: X-api0-Probe-Header
+              value: ready
+          initialDelaySeconds: 3
+          periodSeconds: 10
+

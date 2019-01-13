@@ -1,0 +1,8 @@
+FROM alpine:3.8
+# erlang dependencies extracted from official erlang alpine dockerfile. Look for how .erlang-deps was extracted
+# https://github.com/erlang/docker-erlang-otp/blob/e2e804aeeb6e6bc5fd49f66481be1dff829428f5/21/alpine/Dockerfile
+RUN apk add so:libcrypto.so.1.0.0 so:libncursesw.so.6 so:libz.so.1
+ADD _build/default/rel/api0 /deploy/api0 
+ADD priv/start.sh /deploy/api0
+RUN mkdir -p /deploy/data/api0
+CMD ["/bin/sh", "/deploy/api0/start.sh"]

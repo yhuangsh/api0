@@ -1,0 +1,16 @@
+{application, api0,
+ [{description, "Kubernetes/Erlang REST API experiment app"},
+  {vsn, "0.1.0"},
+  {registered, []},
+  {mod, { api0_app, []}},
+  {applications,
+   [kernel,
+    stdlib
+   ]},
+  {env,[{prefix, "/api0"}]},
+  {modules, []},
+
+  {maintainers, []},
+  {licenses, ["BSD 2-Clause"]},
+  {links, []}
+ ]}.

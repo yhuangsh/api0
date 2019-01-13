@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: api0
+  labels:
+    app: api0
+spec:
+  selector: 
+    app: api0
+  ports:
+  - port: 8000
+    name: api0
+  clusterIP: None
