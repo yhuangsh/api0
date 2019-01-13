@@ -3,7 +3,7 @@ docker run \
     --rm \
     --net api0-net \
     --name api0-2 \
-    --ip 172.28.0.4 \
+    --ip 172.29.0.4 \
     --hostname api0-2.api0.default.svc.cluster.local \
     --add-host api0-0.api0.default.svc.cluster.local:172.28.0.2 \
     --add-host api0-1.api0.default.svc.cluster.local:172.28.0.3 \
