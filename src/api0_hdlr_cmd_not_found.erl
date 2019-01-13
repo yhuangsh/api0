@@ -1,12 +1,15 @@
--module(api0_hdlr_404).
+-module(api0_hdlr_cmd_not_found).
 
--export([init/2]).
+-export([init/2,
+         known_methods/2]).
 
 %%====================================================================
-%% Behaviour exports
+%% Callbacks
 %%====================================================================
 
-init(R, S) -> httpres:'404'("{ \"result\" : \"no such api\" }", R, S).
+init(R, S) -> {cowboy_rest, R, S}.
+
+known_methods(R, S) -> {[], R, S}.
 
 %%====================================================================
 %% API

@@ -22,4 +22,4 @@
 
 reply(C, R, S) -> {ok, cowboy_req:reply(C, R), S}.
 reply(C, T, R, S) -> reply(C, ?CT_TEXT_JSON, T, R, S).
-reply(C, CT, T, R, S) -> {ok, cowbot_req:reply(C, #{<<"content-type">> => CT}, T, R), S}.
+reply(C, CT, T, R, S) -> {ok, cowboy_req:reply(C, #{<<"content-type">> => CT}, T, R), S}.
