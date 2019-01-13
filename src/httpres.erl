@@ -1,7 +1,7 @@
 -module(httpres).
 
 -export(['200'/2, '200'/3,
-         '400'/3, '404'/2]).
+         '400'/3, '404'/3]).
 
 -define(CT_TEXT, <<"content-type">> => <<"text/text">>).
 
@@ -13,7 +13,7 @@
 '200'(T, R, S) -> reply(200, T, R, S).
 
 '400'(T, R, S) -> reply(400, T, R, S).
-'404'(R, S) -> reply(404, R, <<"api0: ooops, not found!">>, S).
+'404'(T, R, S) -> reply(404, T, R, S).
 
 %%====================================================================
 %% Internal functions
