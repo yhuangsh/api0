@@ -58,8 +58,8 @@ start_cowboy(S0) ->
     {ok, _} = cowboy:start_clear(api0_listner, [{port, 8000}], #{env => #{dispatch => Dispatch}}).
 
 routes(S0) -> [route0(S0)].
-route0(S0) -> {'_', [{prefix("/v1/version"), api0_hdlr_version, S0},
-                     {'_', api0_hdlr_404, []}]}.                
+route0(S0) -> {'_', [{prefix("/v1/version"), api0_hdlr_cmd_version, S0},
+                     {'_', api0_hdlr_cmd_not_found, []}]}.                
 
 prefix(Path) -> application:get_env(api0, prefix, "") ++ Path.
 

@@ -1,13 +1,22 @@
 -module(api0_hdlr_cmd_version).
 
 -export([init/2,
-         allowed_method/2,
-         content_type_provided/2]).
+         allowed_methods/2,
+         content_types_provided/2]).
+
+%%
+-export([cmd_version/2]).
 
 init(R, S) -> {cowboy_rest, R, S}.
 
-allowed_method(R, S) -> {[<<"GET">>], R, S}.
+allowed_methods(R, S) -> {[<<"GET">>], R, S}.
 
-content_type_provided(R, S) -> {[{{<<"text">>, <<"json">>, '*'}, cmd_version}], R, S}.
+content_types_provided(R, S) -> {[{{<<"application">>, <<"json">>, '*'}, cmd_version}], R, S}.
+
+cmd_version(R, S) -> 
+    Body = jsx:encode(#{<<"result">> => <<"ok">>, 
+                        <<"version">> => <<"v1">>}),
+    {Body, R, S}.                        
+
 
 
