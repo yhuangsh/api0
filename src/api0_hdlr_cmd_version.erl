@@ -14,7 +14,7 @@ allowed_methods(R, S) -> {[<<"GET">>], R, S}.
 content_types_provided(R, S) -> {[{{<<"application">>, <<"json">>, '*'}, cmd_version}], R, S}.
 
 cmd_version(R, S) -> 
-    Body = jsx:encode(#{<<"result">> => <<"ok">>, 
+    Body = jsx:encode(#{<<"success">> => true, 
                         <<"version">> => <<"v1">>}),
     {Body, R, S}.                        
 
