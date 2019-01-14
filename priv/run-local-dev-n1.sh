@@ -5,9 +5,9 @@ docker run \
     --name api0-1 \
     --ip 172.29.0.3 \
     --hostname api0-1.api0.default.svc.cluster.local \
-    --add-host api0-0.api0.default.svc.cluster.local:172.28.0.2 \
-    --add-host api0-1.api0.default.svc.cluster.local:172.28.0.3 \
-    --add-host api0-2.api0.default.svc.cluster.local:172.28.0.4 \
+    --add-host api0-0.api0.default.svc.cluster.local:172.29.0.2 \
+    --add-host api0-1.api0.default.svc.cluster.local:172.29.0.3 \
+    --add-host api0-2.api0.default.svc.cluster.local:172.29.0.4 \
     -v `pwd`:/project \
     -p 8001:8000 \
     -it \
