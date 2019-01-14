@@ -10,4 +10,4 @@ spec:
   ports:
   - port: 8000
     name: api0
-
+  clusterIP: None
