@@ -43,6 +43,7 @@ connect_prev_node($0) -> none;
 connect_prev_node(N) when is_integer(N) ->    
     Np0 = ["app@api0-", N-1, ".api0.default.svc.cluster.local"],
     Np1 = list_to_atom(lists:flatten(Np0)),
+    io:format("~npinging [~p]~n", [Np1]),
     pong = net_adm:ping(Np1),
     Np1.
 
@@ -50,7 +51,7 @@ connect_prev_node(N) when is_integer(N) ->
 start_mnesia(none) -> {atomic, ok} = mnesia:create_table(?USER_TAB, []);
 start_mnesia(Np) when is_atom(Np) ->
     {ok, _} = mnesia:change_config(extra_db_nodes, [Np]),
-    {atomic, ok} = mnesia:add_table_copy(?USER_TAB, node(), disc_copies).
+    {atomic, ok} = mnesia:add_table_copy(?USER_TAB, node(), ram_copies).
 
 %%
 start_cowboy(S) ->
