@@ -18,12 +18,12 @@ start_link() ->
 %% Callbacks
 %%====================================================================
 
-init(S0) ->
+init(S) ->
     Np = connect_prev_node(node()),
     ok = mnesia:start(),
     {atomic, ok} = start_mnesia(Np),
-    start_cowboy(S0), 
-    {ok, S0}.
+    start_cowboy(S), 
+    {ok, S}.
 
 handle_call(_Cmd, _From, State) ->
     Reply = ok,
@@ -53,13 +53,13 @@ start_mnesia(Np) when is_atom(Np) ->
     {atomic, ok} = mnesia:add_table_copy(?USER_TAB, node(), disc_copies).
 
 %%
-start_cowboy(S0) ->
-    Dispatch = cowboy_router:compile(routes(S0)),
+start_cowboy(S) ->
+    Dispatch = cowboy_router:compile(routes(S)),
     {ok, _} = cowboy:start_clear(api0_listner, [{port, 8000}], #{env => #{dispatch => Dispatch}}).
 
-routes(S0) -> [route0(S0)].
-route0(S0) -> {'_', [{prefix("/v1/version"), api0_api_version, S0},
-                     {'_', api0_api_not_found, []}]}.                
+routes(S) -> [route0(S)].
+route0(S) -> {'_', [{prefix("/v1/version"), api0_api_version, S},
+                     {'_', api0_api_404, []}]}.                
 
 prefix(Path) -> application:get_env(api0, prefix, "") ++ Path.
 
