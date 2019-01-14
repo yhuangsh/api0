@@ -1,4 +1,4 @@
--module(api0_hdlr_cmd_not_found).
+-module(api0_api_404).
 
 -export([init/2]).
 

@@ -1,4 +1,4 @@
--module(api0_hdlr_cmd_version).
+-module(api0_api_version).
 
 -export([init/2,
          allowed_methods/2,
