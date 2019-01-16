@@ -26,7 +26,7 @@ spec:
     }
     stage('Test') {
       steps {
-        sh 'echo "Nothing, placeholder now"'
+        sh 'rebar3 eunit'
       }
     }
     stage('Release') {
