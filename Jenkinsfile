@@ -16,17 +16,12 @@ spec:
   stages {
     // Pipeline implies SCM clonse/checkout, no explicit git clone needed
     // May consider remove git from the dev image, but decided to leave it for now
-    stage('Build') {
+    stage('Build & Unit Test') {
       steps {
         // rebar3 had to run within the container because it's not included in the Jenkins image
         container('dev-alpine-erlang') {
-          sh 'rebar3 compile'
+          sh 'rebar3 eunit'
         }
-      }
-    }
-    stage('Test') {
-      steps {
-        sh 'rebar3 eunit'
       }
     }
     stage('Release') {
