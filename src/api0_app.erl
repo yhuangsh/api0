@@ -73,6 +73,7 @@ start_cowboy(S) ->
 routes(S) -> [route0(S)].
 route0(S) -> {'_', [{prefix("/probes/:pb"), api0_probes, S},
                     {prefix("/v1/version"), api0_api_version, S},
+                    {prefix("/v1/create"), api0_api_create, S},
                     {'_', api0_api_404, []}]}.                
 
 prefix(Path) -> application:get_env(api0, prefix, "") ++ Path.
