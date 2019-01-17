@@ -28,17 +28,24 @@ add_table_copy() ->
     mnesia:add_table_copy(?TAB_USER, node(), disc_copies).
 
 %%
-create(U) -> mnesia:transaction(fun() -> mnesia:write(U) end). 
+create(U = #user{id = Id}) -> 
+    mnesia:transaction(
+        fun() -> 
+            case mnesia:read(?TAB_USER, Id) of
+                [] -> mnesia:write(U);
+                [_] -> exists
+            end
+        end).
 read(Id) -> mnesia:dirty_read(?TAB_USER, Id).
 update(U = #user{id = Id}) -> 
     mnesia:transaction(
         fun() ->
             case mnesia:read(?TAB_USER, Id) of 
                 [_] -> mnesia:write(U);
-                Else -> Else
+                [] -> not_exist
             end
         end).
-delete(id) -> mnesia:transaction(fun() -> mnesia:delete({?TAB_USER, id}) end).
+delete(Id) -> mnesia:transaction(fun() -> mnesia:delete({?TAB_USER, Id}) end).
 
 %%====================================================================
 %% Unit tests
@@ -54,13 +61,22 @@ crud_test() ->
     U0 = #user{id = u0000, firstname = "yong", lastname = "huang", gender = "male"},
     U1 = #user{id = u0001},
     U0new = #user{id = u0000, firstname = "jiayu", lastname = "cheng", gender = "female"},
+ 
+    % create
     ?assertEqual({atomic, ok}, create(U0)),
+    ?assertEqual({atomic, exists}, create(U0)),
+    % read
     ?assertEqual([U0], read(u0000)),
     ?assertEqual([], read(u0001)),
+    % update
     ?assertEqual({atomic, ok}, update(U0)),
-    ?assertEqual({atomic, []}, update(U1)),
+    ?assertEqual({atomic, not_exist}, update(U1)),
     ?assertEqual({atomic, ok}, update(U0new)),
     ?assertEqual([U0new], read(u0000)),
+    % delete
+    ?assertEqual({atomic, ok}, delete(u0000)),
+    ?assertEqual([], read(u0000)),
+
     ?assertEqual({atomic, ok}, mnesia:delete_table(?TAB_USER)),
     ?assertEqual(stopped, mnesia:stop()).
 
