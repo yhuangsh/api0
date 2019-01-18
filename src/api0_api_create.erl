@@ -15,17 +15,28 @@ content_types_provided(R, S) -> {[{{<<"application">>, <<"json">>, '*'}, cmd_cre
 
 cmd_create(R0, S) -> 
     {ok, Body, R1} = read_body(R0),
-    case jsx:is_json(Body) of
-        true -> create_user(jsx:decode(Body), R1, S);
-        false -> jsonres:failure("invalid request data", R1, S)
-    end.
+    cmd_create_1(jsx:is_json(Body), Body, R1, S).
 
-create_user(Data, R, S) ->
-    U = tab_user:from_proplist(Data),
-    case tab_user:create(U) of
-        {atomic, ok} -> jsonres:success(<<"user created">>, R, S);
-        {atomic, exists} -> jsonres:failure(<<"user exists">>, R, S)
-    end.
+cmd_create_1(true, Body, R, S) -> cmd_create_2(jsx:decode(Body), R, S);
+cmd_create_1(false, _, R, S) -> jsonres:failure("invalid request data", R, S).
+
+cmd_create_2(BodyMap = #{login_id := LoginId, login_type := LoginType}, R, S) -> 
+    More = maps:filter(fun(login_id, _) -> true; 
+                          (login_type, _) -> true end, BodyMap),
+    cmd_create_3(LoginId, LoginType, More, R, S).
+
+cmd_create_3(LoginId, email, More, R, S) -> cmd_create_4(LoginId, email, More, R, S);
+cmd_create_3(LoginId, phone, More, R, S) -> cmd_create_4(LoginId, phone, More, R, S);
+cmd_create_3(_, _, _, R, S) -> jsonres:failure(<<"invalid login type">>, R, S).
+
+cmd_create_4(LoginId, LoginType, More, R, S) -> 
+    cmd_create_5(tab_user:read_login_id(LoginId), LoginId, LoginType, More, R, S).
+
+cmd_create_5([], LoginId, LoginType, More, R, S) ->
+    U = tab_user:new(LoginId, LoginType, More),
+    {atomic, ok} = tab_user:create(U),
+    jsonres:success(<<"user created">>, tab_user:to_map(U), R, S);
+cmd_create_5([_], _, _, _, R, S) -> jsonres:failure(<<"user exists">>, R, S).
 
 read_body(R) -> read_body(R, <<"">>).
 read_body(R0, Acc) ->
