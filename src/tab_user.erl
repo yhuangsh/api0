@@ -13,7 +13,7 @@
          update/1,
          delete/1,
          
-         new/2,
+         new/3,
          new_from_proplist/1]).
 
 -record(user, {id, login_id, login_type, more}).
@@ -55,10 +55,11 @@ update(U = #user{id = Id}) ->
 delete(Id) -> mnesia:transaction(fun() -> mnesia:delete({?TAB_USER, Id}) end).
 
 %% 
-new(LoginId, LoginType) ->
+new(LoginId, LoginType, More) when is_map(More) ->
     #user{id = gen_id(),
           login_id = LoginId,
-          login_type = LoginType}.
+          login_type = LoginType, 
+          more = More}.
 
 new_from_proplist(P) -> 
     #user{id = gen_id(),

@@ -19,4 +19,4 @@ failure(M, More, R, S) -> result(false, M, More, R, S).
 result(TF, M, R, S) -> result(TF, M, #{}, R, S).
 result(TF, M, More, R, S) -> 
     Output = maps:merge(#{<<"success">> => TF, <<"message">> => M}, More),
-    jsx:encode(Output, R, S).
+    {jsx:encode(Output), R, S}.
