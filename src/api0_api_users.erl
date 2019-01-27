@@ -1,4 +1,4 @@
--module(api0_api_userss).
+-module(api0_api_users).
 
 
 %%====================================================================
@@ -78,7 +78,7 @@ json_acceptors(<<"PUT">>, [_Id], R, S) -> 'PUT /api0/v1/users/ID'(R, S).
     {atomic, ok} = tab_user:create(U),
     {{true, mk_resource_url(U)}, R, S}.
 
-mk_resource_url(#{id := Id}) -> <<"/api0/v1/users/"/binary, Id/binary>>.
+mk_resource_url(#{id := Id}) -> <<<<"/api0/v1/users/">>/binary, Id/binary>>.
 
 %% Read/CRUD
 'GET /api0/v1/users/ID'(R, S = #{api0_old_users := [OldUser], api0_new_users := []}) -> {jsx:encode(OldUser), R, S}.

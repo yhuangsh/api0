@@ -14,11 +14,7 @@
          delete/1,
          
          from_binary/1, 
-         from_proplist/1,
-
-         new/3,
-         new_from_binary/1,
-         new_from_proplist/1]).
+         new_from_binary/1]).
 
 -record(user, {id, login_id, login_type, more}).
 
@@ -38,7 +34,8 @@ add_table_copy() ->
     mnesia:add_table_copy(?TAB_USER, node(), disc_copies).
 
 %% CRUD
-create(U = #user{id = Id}) when is_map(U) -> 
+create(U) when is_map(U) -> create(map2rec(U));
+create(U = #user{id = Id}) when is_tuple(U) -> 
     mnesia:transaction(
         fun() -> 
             case mnesia:read(?TAB_USER, Id) of
@@ -46,11 +43,16 @@ create(U = #user{id = Id}) when is_map(U) ->
                 [_] -> exists
             end
         end).
+
 read(Id) when is_binary(Id) -> 
-    mnesia:dirty_read(?TAB_USER, Id).
+    Users = mnesia:dirty_read(?TAB_USER, Id),
+    lists:map(fun(U) -> rec2map(U) end, Users).
 read_login_id(LoginId) when is_binary(LoginId) -> 
-    mnesia:dirty_index_read(?TAB_USER, LoginId, #user.login_id).
-update(U = #user{id = Id}) when is_map(U) -> 
+    Users = mnesia:dirty_index_read(?TAB_USER, LoginId, #user.login_id),
+    lists:map(fun(U) -> rec2map(U) end, Users).
+
+update(U) when is_map(U) -> update(map2rec(U));
+update(U = #user{id = Id}) when is_tuple(U) -> 
     mnesia:transaction(
         fun() ->
             case mnesia:read(?TAB_USER, Id) of 
@@ -58,48 +60,42 @@ update(U = #user{id = Id}) when is_map(U) ->
                 [] -> not_exist
             end
         end).
+
 delete(Id) when is_binary(Id) -> 
     mnesia:transaction(fun() -> mnesia:delete({?TAB_USER, Id}) end).
 
 %%
-from_binary(B) when is_binary(B) ->
+map2rec(U = #{<<"id">> := Id, <<"login_id">> := LoginId, <<"login_type">> := LoginType, <<"more">> := More}) when is_map(U) ->
+    #user{id = Id, login_id = LoginId, login_type = LoginType, more = More}.
+rec2map(U = #user{id = Id, login_id = LoginId, login_type = LoginType, more = More}) when is_tuple(U) ->
+    #{<<"id">> => Id, <<"login_id">> => LoginId, <<"login_type">> => LoginType, <<"more">> => More}.
+
+%%
+from_binary(B) when is_binary(B) -> mk_user(undefined, B).
+new_from_binary(B) when is_binary(B) -> mk_user(gen_id(), B).
+
+mk_user(Id0, B) ->
     case jsx:is_json(B) of
         false -> #{};
         true -> 
-            P = lists:map(fun({K, V}) -> {binary_to_atom(K, latin1), V} end, jsx:decode(B)),
-            from_proplist(P)   
-    end.  
-
-from_proplist(P) when is_list(P) ->
-    Id = proplists:get_value(id, P), 
-    LoginId = proplists:get_value(login_id, P),
-    LoginType = proplists:get_value(login_type, P),
-    More = proplists:get_value(more, P, #{}),
-    case Id =:= undefined orelse LoginId =:= undefined orelse LoginType =:= undefined of
-        true -> #{};
-        false -> 
-            #user{
-                id = Id,
-                login_id = LoginId,
-                login_type = LoginType,
-                more = More}
-    end.
-
-%% 
-new(LoginId, LoginType, More) when is_binary(LoginId) andalso is_binary(LoginType) andalso is_map(More) ->
-    from_proplist([{id, gen_id()}, {login_id, LoginId}, {login_type, LoginType}, {more, More}]).
-
-new_from_binary(B) when is_binary(B) ->
-    case jsx:is_json(B) of
-        false -> #{};
-        true -> 
-            P = lists:map(fun({K, V}) -> {binary_to_atom(K, latin1), V} end, jsx:decode(B)),
-            new_from_proplist(P)
-    end.
-            
-new_from_proplist(P) when is_list(P) -> from_proplist([{id, gen_id()} | P]).
+            U = jsx:decode(B, [return_maps]), 
+            Id = adjust_id(Id0, U),
+            LoginId = maps:get(<<"login_id">>, U, undefined),
+            LoginType = maps:get(<<"login_type">>, U, undefined),
+            More = maps:get(<<"more">>, U, #{}),
+            validate_user(Id, LoginId, LoginType, More)
+    end. 
 
 gen_id() -> crypto:strong_rand_bytes(32).
+
+adjust_id(undefined, U) -> maps:get(<<"id">>, U, undefined);
+adjust_id(Id, _) -> Id.
+
+validate_user(undefined, _, _, _) -> #{};
+validate_user(_, undefined, _, _) -> #{};
+validate_user(_, _, undefined, _) -> #{};
+validate_user(Id, LoginId, LoginType, More) -> 
+    #{<<"id">> => Id, <<"login_id">> => LoginId, <<"login_type">> => LoginType, <<"more">> => More}.
 
 %%====================================================================
 %% Unit tests
@@ -110,7 +106,8 @@ gen_id() -> crypto:strong_rand_bytes(32).
 crud_test_() ->
     {setup, fun setup/0, fun cleanup/1, 
      fun (D) ->
-        [test_create(D),
+        [test_from_binary(D),
+         test_create(D),
          test_read(D),
          test_update(D),
          test_delete(D)] 
@@ -121,14 +118,22 @@ setup() ->
     ok = mnesia:create_schema([node()]),
     ok = mnesia:start(),
     {atomic, ok} = create_table(),
-    U0 = #user{id = <<"u0000">>, login_id = <<"u0@x.com">>, login_type = <<"email">>},
-    U1 = #user{id = <<"u0001">>},
-    U0new = #user{id = <<"u0000">>, login_id = <<"13812345678">>, login_type = <<"phone">>},
+    U0 = #{<<"id">> => <<"u0000">>, <<"login_id">> => <<"u0@x.com">>, <<"login_type">> => <<"email">>, <<"more">> => #{}},
+    U1 = #{<<"id">> => <<"u0001">>, <<"login_id">> => <<"u1@y.com">>, <<"login_type">> => <<"email">>, <<"more">> => #{<<"extra">> => <<"extra data">>}},
+    U0new = #{<<"id">> => <<"u0000">>, <<"login_id">> => <<"13812345678">>, <<"login_type">> => <<"phone">>, <<"more">> => #{<<"operator">> => <<"cmcc">>}},
     {U0, U1, U0new}.
 
 cleanup(_) -> 
     ?assertEqual({atomic, ok}, mnesia:delete_table(?TAB_USER)),
     ?assertEqual(stopped, mnesia:stop()).
+
+test_from_binary({U0, U1, U0new}) ->
+    U0x = from_binary(<<"{\"id\":\"u0000\", \"login_id\":\"u0@x.com\", \"login_type\":\"email\"}">>),
+    U1x = from_binary(<<"{\"id\":\"u0001\", \"login_id\":\"u1@y.com\", \"login_type\":\"email\"}">>),
+    U0newx = from_binary(<<"{\"id\":\"u0000\", \"login_id\":\"13812345678\", \"login_type\":\"phone\", \"more\": { \"operator\":\"cmcc\"}}">>),
+    [?_assertEqual(U0, U0x),
+     ?_assertNotEqual(U1, U1x),
+     ?_assertEqual(U0new, U0newx)].
 
 test_create({U0, _U1, _U0new}) ->    
     [?_assertEqual({atomic, ok}, create(U0)),
@@ -136,20 +141,20 @@ test_create({U0, _U1, _U0new}) ->
 
 test_read({U0, _U1, _U0new}) ->
     [?_assertEqual([U0], read(<<"u0000">>)),
-     ?_assertEqual([U0], read_login_id("u0@x.com")),
+     ?_assertEqual([U0], read_login_id(<<"u0@x.com">>)),
      ?_assertEqual([], read(<<"u0001">>)),
-     ?_assertEqual([], read_login_id("another@y.com"))].
+     ?_assertEqual([], read_login_id(<<"another@y.com">>))].
 
 test_update({U0, U1, U0new}) ->
     [?_assertEqual({atomic, ok}, update(U0)),
      ?_assertEqual({atomic, not_exist}, update(U1)),
      ?_assertEqual({atomic, ok}, update(U0new)),
      ?_assertEqual([U0new], read(<<"u0000">>)),
-     ?_assertEqual([U0new], read_login_id("13812345678"))].
+     ?_assertEqual([U0new], read_login_id(<<"13812345678">>))].
 
 test_delete({_U0, _U1, _U0new}) ->
     [?_assertEqual({atomic, ok}, delete(<<"u0000">>)),
      ?_assertEqual([], read(<<"u0000">>)),
-     ?_assertEqual([], read_login_id("u0@x.com"))].
+     ?_assertEqual([], read_login_id(<<"u0@x.com">>))].
 
 -endif.
