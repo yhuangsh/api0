@@ -44,13 +44,17 @@ resource_exists(<<"GET">>, [Id], R, S) ->
     OldUsers = tab_user:read(Id),
     set_resource(OldUsers, [], R, S);
 resource_exists(<<"POST">>, [], R0, S) -> 
-    {ok, BodyIn, R1} = cowboy:read_body(R0),
-    NewUser = tab_user:new_from_binary(BodyIn),
-    #{<<"login_id">> := LoginId} = NewUser,
-    OldUsers = tab_user:read_login_id(LoginId),
-    set_resource(OldUsers, [NewUser], R1, S);
+    {ok, BodyIn, R1} = cowboy_req:read_body(R0),
+    io:format("resource_exists BondyIn ~p~n", [BodyIn]),
+    case NewUser = tab_user:new_from_binary(BodyIn) of
+        #{<<"login_id">> := LoginId} ->
+            OldUsers = tab_user:read_login_id(LoginId),
+            set_resource(OldUsers, [NewUser], R1, S);
+        _Else -> 
+            set_resource([], [undefined], R1, S)
+    end;
 resource_exists(<<"PUT">>, [Id], R0, S) ->
-    {ok, BodyIn, R1} = cowboy:read_body(R0),
+    {ok, BodyIn, R1} = cowboy_req:read_body(R0),
     NewUser = tab_user:from_binary(BodyIn),
     OldUsers = tab_user:read(Id),
     set_resource(OldUsers, [NewUser], R1, S);
@@ -61,19 +65,26 @@ resource_exists(_, _, R, S) ->
     set_resource([], [], R, S).
 
 set_resource([], NewUsers, R, S) when is_list(NewUsers) -> 
+    io:format("set resource false NewUsers ~p~n", [NewUsers]),
     {false, R, S#{api0_old_users => [], api0_new_users => NewUsers}};
 set_resource(OldUsers, NewUsers, R, S) when is_list(OldUsers) andalso is_list(NewUsers) -> 
+    io:format("set resource true NewUsers ~p~n", [NewUsers]),
     {true, R, S#{api0_old_users => OldUsers, api0_new_users => NewUsers}}.
 
 %% Providers & Acceptors
 json_providers(<<"GET">>, [_Id], R, S) -> 'GET /api0/v1/users/ID'(R, S).
-json_acceptors(<<"POST">>, [], R, S) -> 'POST /api0/v1/users'(R, S);
+json_acceptors(<<"POST">>, [], R, S) -> 
+    io:format("json_acceptors S ~p~n", [S]),
+    'POST /api0/v1/users'(R, S);
 json_acceptors(<<"PUT">>, [_Id], R, S) -> 'PUT /api0/v1/users/ID'(R, S).
 
 %% Create/CRUD
 'POST /api0/v1/users'(R, S = #{api0_old_users := [U], api0_new_users := _}) -> {{true, mk_resource_url(U)}, R, S}; 
-'POST /api0/v1/users'(R, S = #{api0_old_users := [], api0_new_users := [#{}]}) -> {false, R, S};
+'POST /api0/v1/users'(R, S = #{api0_old_users := [], api0_new_users := [undefined]}) -> 
+    io:format("(2) POST /api0/v1/users S ~p~n", [S]),
+    {false, R, S};
 'POST /api0/v1/users'(R, S = #{api0_old_users := [], api0_new_users := [U]}) -> 
+    io:format("(3) POST /api0/v1/users S ~p~n", [S]),
     {atomic, ok} = tab_user:create(U),
     {{true, mk_resource_url(U)}, R, S}.
 

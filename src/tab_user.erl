@@ -76,7 +76,7 @@ new_from_binary(B) when is_binary(B) -> mk_user(gen_id(), B).
 
 mk_user(Id0, B) ->
     case jsx:is_json(B) of
-        false -> #{};
+        false -> undefined;
         true -> 
             U = jsx:decode(B, [return_maps]), 
             Id = adjust_id(Id0, U),
@@ -91,9 +91,9 @@ gen_id() -> crypto:strong_rand_bytes(32).
 adjust_id(undefined, U) -> maps:get(<<"id">>, U, undefined);
 adjust_id(Id, _) -> Id.
 
-validate_user(undefined, _, _, _) -> #{};
-validate_user(_, undefined, _, _) -> #{};
-validate_user(_, _, undefined, _) -> #{};
+validate_user(undefined, _, _, _) -> undefined;
+validate_user(_, undefined, _, _) -> undefined;
+validate_user(_, _, undefined, _) -> undefined;
 validate_user(Id, LoginId, LoginType, More) -> 
     #{<<"id">> => Id, <<"login_id">> => LoginId, <<"login_type">> => LoginType, <<"more">> => More}.
 
@@ -107,6 +107,7 @@ crud_test_() ->
     {setup, fun setup/0, fun cleanup/1, 
      fun (D) ->
         [test_from_binary(D),
+         test_new_from_binary(D),
          test_create(D),
          test_read(D),
          test_update(D),
@@ -134,6 +135,23 @@ test_from_binary({U0, U1, U0new}) ->
     [?_assertEqual(U0, U0x),
      ?_assertNotEqual(U1, U1x),
      ?_assertEqual(U0new, U0newx)].
+
+test_new_from_binary(_) ->
+    A = new_from_binary(<<"{\"login_id\":\"u0@x.com\", \"login_type\":\"email\"}">>),
+    B = new_from_binary(<<"{\"login_id\":\"u1@y.com\", \"login_type\":\"email\"}">>),
+    C = new_from_binary(<<"{\"login_id\":\"13812345678\", \"login_type\":\"phone\", \"more\": { \"operator\":\"cmcc\"}}">>),
+    #{<<"id">> := IdA, <<"login_id">> := LoginIdA, <<"more">> := MoreA} = A,
+    #{<<"id">> := IdB, <<"login_id">> := LoginIdB, <<"more">> := MoreB} = B,
+    #{<<"id">> := IdC, <<"login_id">> := LoginIdC, <<"more">> := MoreC} = C,
+    [?_assertEqual(32, byte_size(IdA)),
+     ?_assertEqual(32, byte_size(IdB)),
+     ?_assertEqual(32, byte_size(IdC)),
+     ?_assertEqual(<<"u0@x.com">>, LoginIdA),
+     ?_assertEqual(<<"u1@y.com">>, LoginIdB),
+     ?_assertEqual(<<"13812345678">>, LoginIdC),
+     ?_assertEqual(#{}, MoreA),
+     ?_assertEqual(#{}, MoreB),
+     ?_assertEqual(#{<<"operator">> => <<"cmcc">>}, MoreC)].
 
 test_create({U0, _U1, _U0new}) ->    
     [?_assertEqual({atomic, ok}, create(U0)),
