@@ -46,7 +46,7 @@ resource_exists(<<"GET">>, [Id], R, S) ->
 resource_exists(<<"POST">>, [], R0, S) -> 
     {ok, BodyIn, R1} = cowboy:read_body(R0),
     NewUser = tab_user:new_from_binary(BodyIn),
-    #{login_id := LoginId} = NewUser,
+    #{<<"login_id">> := LoginId} = NewUser,
     OldUsers = tab_user:read_login_id(LoginId),
     set_resource(OldUsers, [NewUser], R1, S);
 resource_exists(<<"PUT">>, [Id], R0, S) ->
@@ -67,7 +67,6 @@ set_resource(OldUsers, NewUsers, R, S) when is_list(OldUsers) andalso is_list(Ne
 
 %% Providers & Acceptors
 json_providers(<<"GET">>, [_Id], R, S) -> 'GET /api0/v1/users/ID'(R, S).
-
 json_acceptors(<<"POST">>, [], R, S) -> 'POST /api0/v1/users'(R, S);
 json_acceptors(<<"PUT">>, [_Id], R, S) -> 'PUT /api0/v1/users/ID'(R, S).
 
@@ -78,7 +77,7 @@ json_acceptors(<<"PUT">>, [_Id], R, S) -> 'PUT /api0/v1/users/ID'(R, S).
     {atomic, ok} = tab_user:create(U),
     {{true, mk_resource_url(U)}, R, S}.
 
-mk_resource_url(#{id := Id}) -> <<<<"/api0/v1/users/">>/binary, Id/binary>>.
+mk_resource_url(#{<<"id">> := Id}) -> <<<<"/api0/v1/users/">>/binary, Id/binary>>.
 
 %% Read/CRUD
 'GET /api0/v1/users/ID'(R, S = #{api0_old_users := [OldUser], api0_new_users := []}) -> {jsx:encode(OldUser), R, S}.
@@ -87,8 +86,8 @@ mk_resource_url(#{id := Id}) -> <<<<"/api0/v1/users/">>/binary, Id/binary>>.
 'PUT /api0/v1/users/ID'(R, S = #{api0_old_users := [], api0_new_users := _}) -> {false, R, S};
 'PUT /api0/v1/users/ID'(R, S = #{api0_old_users := _, api0_new_users := []}) -> {false, R, S};
 'PUT /api0/v1/users/ID'(R, S = #{api0_old_users := [OldUser], api0_new_users := [NewUser]}) -> 
-    #{id := OldId, login_id := OldLoginId} = OldUser,
-    #{id := NewId, login_id := NewLoginId} = NewUser,
+    #{<<"id">> := OldId, <<"login_id">> := OldLoginId} = OldUser,
+    #{<<"id">> := NewId, <<"login_id">> := NewLoginId} = NewUser,
     case OldId =:= NewId andalso OldLoginId =:= NewLoginId of
         false -> {false, R, S};
         true -> 
@@ -98,7 +97,7 @@ mk_resource_url(#{id := Id}) -> <<<<"/api0/v1/users/">>/binary, Id/binary>>.
 
 %% Delete/CRUD
 'DELETE /api0/v1/users/ID'(R, S = #{api0_old_users := [OldUser], api0_new_users := []}) -> 
-    #{id := Id} = OldUser,
+    #{<<"id">> := Id} = OldUser,
     {atomic, ok} = tab_user:delete(Id),
     {true, R, S}.
     
