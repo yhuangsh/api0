@@ -37,8 +37,6 @@ json_providers(R, S = #{method := M, path_list := PL}) -> json_providers(M, PL, 
 json_providers(<<"GET">>, [<<"version">>], R, S) -> 'GET /api0/v1/info/version'(R, S).
 
 %% Read/CRUD
-'GET /api0/v1/info/version'(R, S) ->
-    Body = jsx:encode(#{<<"success">> => true, 
-                        <<"version">> => <<"v1">>}),
-    {Body, R, S}.                        
+'GET /api0/v1/info/version'(R, S) -> {"{\"success\":true,\"version\":\"v1\"}", R, S}.
+                     
 
