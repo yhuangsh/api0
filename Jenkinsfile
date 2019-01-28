@@ -20,8 +20,8 @@ spec:
       steps {
         // rebar3 had to run within the container because it's not included in the Jenkins image
         container('dev-alpine-erlang') {
-          sh 'rebar3 eunit --name app'
-          sh 'rebar3 ct --name app'
+          sh 'rebar3 eunit'
+          sh 'rebar3 ct'
         }
       }
     }
