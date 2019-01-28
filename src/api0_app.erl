@@ -34,6 +34,7 @@ init() ->
 
 %% TODO: only works for api0-x, where 0 <= x <= 9
 connect_prev_node(N) when is_atom(N) -> connect_prev_node(atom_to_list(N));
+connect_prev_node("nonode@nohost") -> none;
 connect_prev_node([$a,$p,$p,$@,$a,$p,$i,$0,$-, N | _]) -> connect_prev_node(N);
 connect_prev_node($0) -> none;
 connect_prev_node(N) when is_integer(N) ->    
