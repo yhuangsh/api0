@@ -28,10 +28,6 @@ content_types_accepted(R, S) -> {[{?CT_JSON, json_acceptors}], R, S}.
 
 resource_exists(R, S = #{method := M, path_list := PL}) -> resource_exists(M, PL, R, S).
 
-%% Create/Read/Update
-json_acceptors(R, S = #{method := M, path_list := PL}) -> json_acceptors(M, PL, R, S).
-json_providers(R, S = #{method := M, path_list := PL}) -> json_providers(M, PL, R, S).
-
 %% Delete
 delete_resource(R, S) -> 'DELETE /api0/v1/users/ID'(R, S).
 
@@ -40,7 +36,8 @@ delete_resource(R, S) -> 'DELETE /api0/v1/users/ID'(R, S).
 %%====================================================================
 
 %% Resource Existences
-resource_exists(<<"GET">>, [Id], R, S) -> 
+resource_exists(<<"GET">>, [IdStr], R, S) -> 
+    Id = uuid:string_to_uuid(IdStr),
     OldUsers = tab_user:read(Id),
     set_resource(OldUsers, [], R, S);
 resource_exists(<<"POST">>, [], R0, S) -> 
@@ -53,12 +50,14 @@ resource_exists(<<"POST">>, [], R0, S) ->
         _Else -> 
             set_resource([], [undefined], R1, S)
     end;
-resource_exists(<<"PUT">>, [Id], R0, S) ->
+resource_exists(<<"PUT">>, [IdStr], R0, S) ->
+    Id = uuid:string_to_uuid(IdStr),
     {ok, BodyIn, R1} = cowboy_req:read_body(R0),
     NewUser = tab_user:from_binary(BodyIn),
     OldUsers = tab_user:read(Id),
     set_resource(OldUsers, [NewUser], R1, S);
-resource_exists(<<"DELETE">>, [Id], R, S) ->
+resource_exists(<<"DELETE">>, [IdStr], R, S) -> 
+    Id = uuid:string_to_uuid(IdStr),
     OldUsers = tab_user:read(Id),
     set_resource(OldUsers, [], R, S);
 resource_exists(_, _, R, S) -> 
@@ -72,6 +71,9 @@ set_resource(OldUsers, NewUsers, R, S) when is_list(OldUsers) andalso is_list(Ne
     {true, R, S#{api0_old_users => OldUsers, api0_new_users => NewUsers}}.
 
 %% Providers & Acceptors
+json_acceptors(R, S = #{method := M, path_list := PL}) -> json_acceptors(M, PL, R, S).
+json_providers(R, S = #{method := M, path_list := PL}) -> json_providers(M, PL, R, S).
+
 json_providers(<<"GET">>, [_Id], R, S) -> 'GET /api0/v1/users/ID'(R, S).
 json_acceptors(<<"POST">>, [], R, S) -> 
     io:format("json_acceptors S ~p~n", [S]),
@@ -88,7 +90,9 @@ json_acceptors(<<"PUT">>, [_Id], R, S) -> 'PUT /api0/v1/users/ID'(R, S).
     {atomic, ok} = tab_user:create(U),
     {{true, mk_resource_url(U)}, R, S}.
 
-mk_resource_url(#{<<"id">> := Id}) -> <<<<"/api0/v1/users/">>/binary, Id/binary>>.
+mk_resource_url(#{<<"id">> := Id}) -> 
+    IdStr = uuid:uuid_to_string(Id, binary_nodash),
+    <<<<"/api0/v1/users/">>/binary, IdStr/binary>>.
 
 %% Read/CRUD
 'GET /api0/v1/users/ID'(R, S = #{api0_old_users := [OldUser], api0_new_users := []}) -> {jsx:encode(OldUser), R, S}.

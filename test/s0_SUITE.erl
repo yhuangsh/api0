@@ -32,7 +32,11 @@ test_v1_version(_Config) ->
 test_POST_api0_v1_users(Config) ->
     {ok, BodyIn} = read_file(Config, "create_test0.json"), 
     io:format("body in ~p~n", [BodyIn]),
-    201 = post("/api0/v1/users", BodyIn).
+    {201, Headers, _} = post("/api0/v1/users", BodyIn),
+    #{"location" := Location} = Headers,
+    io:format("Location: ~p~n", [Location]),
+    [[], IdStr] = string:split(Location, "/api0/v1/users/"),
+    true = uuid:is_v4(uuid:string_to_uuid(IdStr)).
 
 %%====================================================================
 %% Internal functions
@@ -49,9 +53,9 @@ req(Path) ->
     {Code, jsx:decode(list_to_binary(BodyOut), [return_maps])}.
 
 post(Path, BodyIn) ->
-    {ok, {{_, Code, _}, _, _}} = 
+    {ok, {{_, Code, _}, Headers, Body}} = 
         httpc:request(post, {prefix(Path), [], "application/json", BodyIn}, [{timeout, ?TIMEOUT}], []),
-    Code.
+    {Code, maps:from_list(Headers), Body}.
 
 prefix(Path) ->
     ?HOST ++ ":" ++ ?PORT ++ Path.

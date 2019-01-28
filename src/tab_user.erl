@@ -19,6 +19,7 @@
 -record(user, {id, login_id, login_type, more}).
 
 -define(TAB_USER, user).
+-define(ID_LEN, 16).
 
 %%====================================================================
 %% API
@@ -71,32 +72,28 @@ rec2map(U = #user{id = Id, login_id = LoginId, login_type = LoginType, more = Mo
     #{<<"id">> => Id, <<"login_id">> => LoginId, <<"login_type">> => LoginType, <<"more">> => More}.
 
 %%
-from_binary(B) when is_binary(B) -> mk_user(undefined, B).
-new_from_binary(B) when is_binary(B) -> mk_user(gen_id(), B).
+from_binary(B) when is_binary(B) -> validate_user(mk_user(B)).
+new_from_binary(B) when is_binary(B) -> new_from_binary(mk_user(B));
+new_from_binary({undefined, LoginId, LoginType, More}) -> validate_user({gen_id(), LoginId, LoginType, More}).
 
-mk_user(Id0, B) ->
-    case jsx:is_json(B) of
-        false -> undefined;
-        true -> 
-            U = jsx:decode(B, [return_maps]), 
-            Id = adjust_id(Id0, U),
-            LoginId = maps:get(<<"login_id">>, U, undefined),
-            LoginType = maps:get(<<"login_type">>, U, undefined),
-            More = maps:get(<<"more">>, U, #{}),
-            validate_user(Id, LoginId, LoginType, More)
-    end. 
+mk_user(B) -> mk_user(jsx:is_json(B), B).
+mk_user(false, _) -> undefined;
+mk_user(true, B) ->
+    U = jsx:decode(B, [return_maps]), 
+    Id = maps:get(<<"id">>, U, undefined),
+    LoginId = maps:get(<<"login_id">>, U, undefined),
+    LoginType = maps:get(<<"login_type">>, U, undefined),
+    More = maps:get(<<"more">>, U, #{}),
+    {Id, LoginId, LoginType, More}.
 
-gen_id() -> crypto:strong_rand_bytes(32).
-
-adjust_id(undefined, U) -> maps:get(<<"id">>, U, undefined);
-adjust_id(Id, _) -> Id.
-
-validate_user(undefined, _, _, _) -> undefined;
-validate_user(_, undefined, _, _) -> undefined;
-validate_user(_, _, undefined, _) -> undefined;
-validate_user(Id, LoginId, LoginType, More) -> 
+validate_user(undefined) -> undefined;
+validate_user({undefined, _, _, _}) -> undefined;
+validate_user({_, undefined, _, _}) -> undefined;
+validate_user({_, _, undefined, _}) -> undefined;
+validate_user({Id, LoginId, LoginType, More}) -> 
     #{<<"id">> => Id, <<"login_id">> => LoginId, <<"login_type">> => LoginType, <<"more">> => More}.
 
+gen_id() -> uuid:get_v4().
 %%====================================================================
 %% Unit tests
 %%====================================================================
@@ -143,9 +140,9 @@ test_new_from_binary(_) ->
     #{<<"id">> := IdA, <<"login_id">> := LoginIdA, <<"more">> := MoreA} = A,
     #{<<"id">> := IdB, <<"login_id">> := LoginIdB, <<"more">> := MoreB} = B,
     #{<<"id">> := IdC, <<"login_id">> := LoginIdC, <<"more">> := MoreC} = C,
-    [?_assertEqual(32, byte_size(IdA)),
-     ?_assertEqual(32, byte_size(IdB)),
-     ?_assertEqual(32, byte_size(IdC)),
+    [?_assertEqual(?ID_LEN, byte_size(IdA)),
+     ?_assertEqual(?ID_LEN, byte_size(IdB)),
+     ?_assertEqual(?ID_LEN, byte_size(IdC)),
      ?_assertEqual(<<"u0@x.com">>, LoginIdA),
      ?_assertEqual(<<"u1@y.com">>, LoginIdB),
      ?_assertEqual(<<"13812345678">>, LoginIdC),
