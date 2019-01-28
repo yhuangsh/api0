@@ -1,19 +1,20 @@
 -module(api0_api_users).
 
-%%====================================================================
-%% Callback functions
-%%====================================================================
 -export([init/2,
          allowed_methods/2,
          resource_exists/2,
          content_types_provided/2,
-         content_types_accepted/2]).
-
--export([json_acceptors/2, 
-         json_providers/2,
+         content_types_accepted/2,
          delete_resource/2]).
 
+-export([json_acceptors/2, 
+         json_providers/2]).
+
 -define(CT_JSON, {<<"application">>, <<"json">>, '*'}).
+
+%%====================================================================
+%% Callback functions
+%%====================================================================
 
 init(R, S) -> 
     Method = cowboy_req:method(R),
@@ -27,21 +28,20 @@ content_types_accepted(R, S) -> {[{?CT_JSON, json_acceptors}], R, S}.
 
 resource_exists(R, S = #{method := M, path_list := PL}) -> resource_exists(M, PL, R, S).
 
-%% Delete
 delete_resource(R, S) -> 'DELETE /api0/v1/users/ID'(R, S).
 
 %%====================================================================
 %% Internal functions
 %%====================================================================
 
-%% Resource Existences
+%% Resource Existence
 resource_exists(<<"GET">>, [IdStr], R, S) -> 
     Id = uuid:string_to_uuid(IdStr),
     OldUsers = tab_user:read(Id),
     set_resource(OldUsers, [], R, S);
 resource_exists(<<"POST">>, [], R0, S) -> 
     {ok, BodyIn, R1} = cowboy_req:read_body(R0),
-    io:format("resource_exists BondyIn ~p~n", [BodyIn]),
+    %io:format("resource_exists BondyIn ~p~n", [BodyIn]),
     case NewUser = tab_user:new_from_binary(BodyIn) of
         #{<<"login_id">> := LoginId} ->
             OldUsers = tab_user:read_login_id(LoginId),
@@ -63,29 +63,25 @@ resource_exists(_, _, R, S) ->
     set_resource([], [], R, S).
 
 set_resource([], NewUsers, R, S) when is_list(NewUsers) -> 
-    io:format("set resource false NewUsers ~p~n", [NewUsers]),
+    %io:format("set resource false NewUsers ~p~n", [NewUsers]),
     {false, R, S#{api0_old_users => [], api0_new_users => NewUsers}};
 set_resource(OldUsers, NewUsers, R, S) when is_list(OldUsers) andalso is_list(NewUsers) -> 
-    io:format("set resource true NewUsers ~p~n", [NewUsers]),
+    %io:format("set resource true NewUsers ~p~n", [NewUsers]),
     {true, R, S#{api0_old_users => OldUsers, api0_new_users => NewUsers}}.
 
-%% Providers & Acceptors
+%% Providers 
 json_acceptors(R, S = #{method := M, path_list := PL}) -> json_acceptors(M, PL, R, S).
-json_providers(R, S = #{method := M, path_list := PL}) -> json_providers(M, PL, R, S).
-
-json_providers(<<"GET">>, [_Id], R, S) -> 'GET /api0/v1/users/ID'(R, S).
-json_acceptors(<<"POST">>, [], R, S) -> 
-    io:format("json_acceptors S ~p~n", [S]),
-    'POST /api0/v1/users'(R, S);
+json_acceptors(<<"POST">>, [], R, S) -> 'POST /api0/v1/users'(R, S);
 json_acceptors(<<"PUT">>, [_Id], R, S) -> 'PUT /api0/v1/users/ID'(R, S).
+%% Acceptors
+json_providers(R, S = #{method := M, path_list := PL}) -> json_providers(M, PL, R, S).
+json_providers(<<"GET">>, [_Id], R, S) -> 'GET /api0/v1/users/ID'(R, S).
 
 %% Create/CRUD
 'POST /api0/v1/users'(R, S = #{api0_old_users := [U], api0_new_users := _}) -> {{true, mk_resource_url(U)}, R, S}; 
-'POST /api0/v1/users'(R, S = #{api0_old_users := [], api0_new_users := [undefined]}) -> 
-    io:format("(2) POST /api0/v1/users S ~p~n", [S]),
-    {false, R, S};
+'POST /api0/v1/users'(R, S = #{api0_old_users := [], api0_new_users := [undefined]}) -> {false, R, S};
 'POST /api0/v1/users'(R, S = #{api0_old_users := [], api0_new_users := [U]}) -> 
-    io:format("(3) POST /api0/v1/users S ~p~n", [S]),
+    %io:format("(3) POST /api0/v1/users S ~p~n", [S]),
     {atomic, ok} = tab_user:create(U),
     {{true, mk_resource_url(U)}, R, S}.
 
