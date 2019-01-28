@@ -31,11 +31,11 @@ test_GET_api0_v1_info_version(_Config) ->
 %% POST /api0/v1/users
 test_POST_api0_v1_users(Config) ->
     {ok, BodyIn} = read_file(Config, "create_test0.json"), 
-    io:format("body in ~p~n", [BodyIn]),
+    %io:format("body in ~p~n", [BodyIn]),
     {201, Headers, _} = 'POST'("/api0/v1/users", BodyIn),
     #{"location" := Location} = Headers,
-    io:format("Location: ~p~n", [Location]),
-    [[], IdStr] = string:split(Location, "/api0/v1/users/"),
+    %io:format("Location: ~p~n", [Location]),
+    "/api0/v1/users/" ++ IdStr = Location,
     true = uuid:is_v4(uuid:string_to_uuid(IdStr)).
 
 %%====================================================================
