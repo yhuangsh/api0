@@ -29,7 +29,7 @@ resource_exists(R, S = #{method := M, path_list := PL}) -> resource_exists(M, PL
 %%====================================================================
 
 %% Resource Existence
-resource_exists(<<"GET">>, [<<"version">>], R, S) -> {true, R, S#{api0_info => version}};
+resource_exists(<<"GET">>, [<<"version">>], R, S) -> {true, R, S};
 resource_exists(_, _, R, S) -> {false, R, S}.
 
 %% Providers
@@ -38,5 +38,3 @@ json_providers(<<"GET">>, [<<"version">>], R, S) -> 'GET /api0/v1/info/version'(
 
 %% Read/CRUD
 'GET /api0/v1/info/version'(R, S) -> {"{\"success\":true,\"version\":\"v1\"}", R, S}.
-                     
-
