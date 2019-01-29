@@ -93,7 +93,7 @@ validate_user({_, _, undefined, _}) -> undefined;
 validate_user({Id, LoginId, LoginType, More}) -> 
     #{<<"id">> => Id, <<"login_id">> => LoginId, <<"login_type">> => LoginType, <<"more">> => More}.
 
-gen_id() -> uuid:get_v4().
+gen_id() -> uuid:uuid_to_string(uuid:get_v4(), binary_nodash).
 %%====================================================================
 %% Unit tests
 %%====================================================================
