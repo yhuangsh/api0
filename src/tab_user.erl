@@ -19,7 +19,7 @@
 -record(user, {id, login_id, login_type, more}).
 
 -define(TAB_USER, user).
--define(ID_LEN, 16).
+
 
 %%====================================================================
 %% API
@@ -99,6 +99,8 @@ gen_id() -> uuid:uuid_to_string(uuid:get_v4(), binary_nodash).
 %%====================================================================
 
 -ifdef(TEST).
+
+-define(ID_LEN, 32).
 
 crud_test_() ->
     {setup, fun setup/0, fun cleanup/1, 
