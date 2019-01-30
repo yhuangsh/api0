@@ -82,20 +82,16 @@ json_providers(<<"GET">>, [_Id], R, S) -> 'GET /api0/v1/users/ID'(R, S).
 mk_resource_url(#{<<"id">> := Id}) -> <<<<"/api0/v1/users/">>/binary, Id/binary>>.
 
 %% Read/CRUD
-'GET /api0/v1/users/ID'(R, S = #{api0_old_users := [OldUser], api0_new_users := []}) -> {jsx:encode(OldUser), R, S}.
+'GET /api0/v1/users/ID'(R, S = #{api0_old_users := [OldUser], api0_new_users := []}) ->
+    {jsx:encode(maps:merge(#{<<"success">> => true}, OldUser)), R, S}.
 
 %% Update/CRUD
 'PUT /api0/v1/users/ID'(R, S = #{api0_old_users := [], api0_new_users := _}) -> {false, R, S};
 'PUT /api0/v1/users/ID'(R, S = #{api0_old_users := _, api0_new_users := []}) -> {false, R, S};
 'PUT /api0/v1/users/ID'(R, S = #{api0_old_users := [OldUser], api0_new_users := [NewUser]}) -> 
-    #{<<"id">> := OldId, <<"login_id">> := OldLoginId} = OldUser,
-    #{<<"id">> := NewId, <<"login_id">> := NewLoginId} = NewUser,
-    case OldId =:= NewId andalso OldLoginId =:= NewLoginId of
-        false -> {false, R, S};
-        true -> 
-            {atomic, ok} = tab_user:update(NewUser),
-            {true, R, S}
-    end.
+    Merged = deep_map_merge(OldUser, NewUser), 
+    {atomic, ok} = tab_user:update(Merged),
+    {true, R, S}.
 
 %% Delete/CRUD
 'DELETE /api0/v1/users/ID'(R, S = #{api0_old_users := [OldUser], api0_new_users := []}) -> 
@@ -103,6 +99,22 @@ mk_resource_url(#{<<"id">> := Id}) -> <<<<"/api0/v1/users/">>/binary, Id/binary>
     {atomic, ok} = tab_user:delete(Id),
     {true, R, S}.
     
+deep_map_merge(M1, M2) -> deep_map_merge(find_map_elem(M1), find_map_elem(M2), M1, M2).
 
+deep_map_merge([], _, M1, M2) -> maps:merge(M1, M2);
+deep_map_merge(_, [], M1, M2) -> maps:merge(M1, M2);
+deep_map_merge(K1, K2, M1, M2) ->
+    CommonMapKeys = find_common_map_keys(K1, K2),
+    MergedMapAsList = [{K, deep_map_merge(maps:get(K, M1), maps:get(K, M2))} || K <- CommonMapKeys],
+    MergedMap = maps:from_list(MergedMapAsList),
+    M3 = maps:merge(M1, M2),
+    maps:merge(M3, MergedMap).
 
+find_map_elem(M) -> lists:filter(fun(K) -> is_map(maps:get(K, M)) end, maps:keys(M)).
+
+find_common_map_keys(K1, K2) -> 
+    S1 = sets:from_list(K1),
+    S2 = sets:from_list(K2),
+    S = sets:intersection([S1, S2]),
+    sets:to_list(S).
 
