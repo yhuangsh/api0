@@ -1,5 +1,9 @@
 -module(api0_api_users).
 
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+-endif.
+
 -export([init/2,
          allowed_methods/2,
          resource_exists/2,
@@ -50,7 +54,7 @@ resource_exists(<<"POST">>, [], R0, S) ->
     end;
 resource_exists(<<"PUT">>, [Id], R0, S) ->
     {ok, BodyIn, R1} = cowboy_req:read_body(R0),
-    NewUser = tab_user:from_binary(BodyIn),
+    NewUser = jsx:decode(BodyIn, [return_maps]),
     OldUsers = tab_user:read(Id),
     set_resource(OldUsers, [NewUser], R1, S);
 resource_exists(<<"DELETE">>, [Id], R, S) -> 
@@ -89,9 +93,13 @@ mk_resource_url(#{<<"id">> := Id}) -> <<<<"/api0/v1/users/">>/binary, Id/binary>
 'PUT /api0/v1/users/ID'(R, S = #{api0_old_users := [], api0_new_users := _}) -> {false, R, S};
 'PUT /api0/v1/users/ID'(R, S = #{api0_old_users := _, api0_new_users := []}) -> {false, R, S};
 'PUT /api0/v1/users/ID'(R, S = #{api0_old_users := [OldUser], api0_new_users := [NewUser]}) -> 
-    Merged = deep_map_merge(OldUser, NewUser), 
-    {atomic, ok} = tab_user:update(Merged),
-    {true, R, S}.
+    case tab_user:is_mergeable(NewUser) of
+        false -> {false, R, S};
+        true ->
+            UpdateUser = tab_user:merge(OldUser, NewUser), 
+            {atomic, ok} = tab_user:update(UpdateUser), 
+            {true, R, S}
+    end.
 
 %% Delete/CRUD
 'DELETE /api0/v1/users/ID'(R, S = #{api0_old_users := [OldUser], api0_new_users := []}) -> 
@@ -99,22 +107,3 @@ mk_resource_url(#{<<"id">> := Id}) -> <<<<"/api0/v1/users/">>/binary, Id/binary>
     {atomic, ok} = tab_user:delete(Id),
     {true, R, S}.
     
-deep_map_merge(M1, M2) -> deep_map_merge(find_map_elem(M1), find_map_elem(M2), M1, M2).
-
-deep_map_merge([], _, M1, M2) -> maps:merge(M1, M2);
-deep_map_merge(_, [], M1, M2) -> maps:merge(M1, M2);
-deep_map_merge(K1, K2, M1, M2) ->
-    CommonMapKeys = find_common_map_keys(K1, K2),
-    MergedMapAsList = [{K, deep_map_merge(maps:get(K, M1), maps:get(K, M2))} || K <- CommonMapKeys],
-    MergedMap = maps:from_list(MergedMapAsList),
-    M3 = maps:merge(M1, M2),
-    maps:merge(M3, MergedMap).
-
-find_map_elem(M) -> lists:filter(fun(K) -> is_map(maps:get(K, M)) end, maps:keys(M)).
-
-find_common_map_keys(K1, K2) -> 
-    S1 = sets:from_list(K1),
-    S2 = sets:from_list(K2),
-    S = sets:intersection([S1, S2]),
-    sets:to_list(S).
-

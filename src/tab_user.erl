@@ -13,8 +13,12 @@
          update/1,
          delete/1,
          
+         is_mergeable/1,
+
          from_binary/1, 
-         new_from_binary/1]).
+         new_from_binary/1,
+         
+         merge/2]).
 
 -record(user, {id, login_id, login_type, more}).
 
@@ -66,10 +70,8 @@ delete(Id) when is_binary(Id) ->
     mnesia:transaction(fun() -> mnesia:delete({?TAB_USER, Id}) end).
 
 %%
-map2rec(U = #{<<"id">> := Id, <<"login_id">> := LoginId, <<"login_type">> := LoginType, <<"more">> := More}) when is_map(U) ->
-    #user{id = Id, login_id = LoginId, login_type = LoginType, more = More}.
-rec2map(U = #user{id = Id, login_id = LoginId, login_type = LoginType, more = More}) when is_tuple(U) ->
-    #{<<"id">> => Id, <<"login_id">> => LoginId, <<"login_type">> => LoginType, <<"more">> => More}.
+is_mergeable(U) when is_map(U) -> 
+    #{} =:= maps:without([<<"login_id">>, <<"login_type">>, <<"more">>], U).
 
 %%
 from_binary(B) when is_binary(B) -> validate_user(mk_user(B)).
@@ -94,6 +96,31 @@ validate_user({Id, LoginId, LoginType, More}) ->
     #{<<"id">> => Id, <<"login_id">> => LoginId, <<"login_type">> => LoginType, <<"more">> => More}.
 
 gen_id() -> uuid:uuid_to_string(uuid:get_v4(), binary_nodash).
+
+%%
+map2rec(U = #{<<"id">> := Id, <<"login_id">> := LoginId, <<"login_type">> := LoginType, <<"more">> := More}) when is_map(U) ->
+    #user{id = Id, login_id = LoginId, login_type = LoginType, more = More}.
+rec2map(U = #user{id = Id, login_id = LoginId, login_type = LoginType, more = More}) when is_tuple(U) ->
+    #{<<"id">> => Id, <<"login_id">> => LoginId, <<"login_type">> => LoginType, <<"more">> => More}.
+
+merge(M1, M2) -> deep_map_merge(find_map_keys(M1), find_map_keys(M2), M1, M2).
+
+deep_map_merge([], _, M1, M2) -> maps:merge(M1, M2);
+deep_map_merge(_, [], M1, M2) -> maps:merge(M1, M2);
+deep_map_merge(K1, K2, M1, M2) ->
+    CommonMapKeys = find_common_map_keys(K1, K2),
+    MergedMapAsList = [{K, merge(maps:get(K, M1), maps:get(K, M2))} || K <- CommonMapKeys],
+    MergedMap = maps:from_list(MergedMapAsList),
+    M3 = maps:merge(M1, M2),
+    maps:merge(M3, MergedMap).
+
+find_map_keys(M) -> lists:filter(fun(K) -> is_map(maps:get(K, M)) end, maps:keys(M)).
+
+find_common_map_keys(K1, K2) -> 
+    S1 = sets:from_list(K1),
+    S2 = sets:from_list(K2),
+    S = sets:intersection([S1, S2]),
+    sets:to_list(S).
 %%====================================================================
 %% Unit tests
 %%====================================================================
@@ -173,5 +200,32 @@ test_delete({_U0, _U1, _U0new}) ->
     [?_assertEqual({atomic, ok}, delete(<<"u0000">>)),
      ?_assertEqual([], read(<<"u0000">>)),
      ?_assertEqual([], read_login_id(<<"u0@x.com">>))].
+
+
+merge_test_() ->
+    [test_merge_0(),
+     test_merge_1()].
+
+test_merge_0() ->
+    M1 = #{}, M2 = #{},
+    M3 = #{field1 => a}, M4 = #{field2 => b},
+    M5 = #{field1 => a}, M6 = #{},
+    M7 = #{}, M8 = #{field2 => b},
+    M9 = #{field1 => a, field2 => b}, M10 = #{field1 => a, field2 => c},
+    [?_assertEqual(#{}, merge(M1, M2)),
+     ?_assertEqual(#{field1 => a, field2 => b}, merge(M3, M4)),
+     ?_assertEqual(#{field1 => a}, merge(M5, M6)),
+     ?_assertEqual(#{field2 => b}, merge(M7, M8)),
+     ?_assertEqual(#{field1 => a, field2 => c}, merge(M9, M10))].
+
+test_merge_1() -> 
+    M1 = #{f1 => a, f2 => #{f1 => b}}, M2 = #{f2 => b, f3 => #{f1 => b}},
+    M3 = #{f1 => a, f2 => #{f1 => b}}, M4 = #{f1 => b, f2 => #{f1 => a, f2 => c}},
+    M5 = #{f1 => a, f2 => #{f1 => b, f2 => #{h1 => d}}}, M6 = #{f1 => #{}, f2 => #{f1 => a, f2 => #{h2 => e}}},
+    M7 = #{f1 => a, f2 => #{f1 => b, f2 => #{}}}, M8 = #{f1 => #{}, f2 => #{f1 => a, f2 => #{h2 => e}}},
+    [?_assertEqual(#{f1 => a, f2 => b, f3 => #{f1 => b}}, merge(M1, M2)),
+     ?_assertEqual(#{f1 => b, f2 => #{f1 => a, f2 => c}}, merge(M3, M4)),
+     ?_assertEqual(#{f1 => #{}, f2 => #{f1 => a, f2 => #{h1 => d, h2 => e}}}, merge(M5, M6)),
+     ?_assertEqual(#{f1 => #{}, f2 => #{f1 => a, f2 => #{h2 => e}}}, merge(M7, M8))].
 
 -endif.
