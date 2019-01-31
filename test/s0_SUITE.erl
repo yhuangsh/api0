@@ -35,25 +35,25 @@ test_GET_api0_v1_info_version(_Config) ->
 %% POST /api0/v1/users | Create/CRUD
 test_POST_api0_v1_users(Config) ->
     {ok, BodyIn} = read_file(Config, "create_test0.json"), 
-    io:format("body in ~p~n", [BodyIn]),
+    %io:format("body in ~p~n", [BodyIn]),
     {201, Headers, _} = 'POST'("/api0/v1/users", BodyIn),
-    {Location, Id} = get_loc_id(Headers),
-    io:format("POST Location: ~p~n", [Location]),
+    {_, Id} = get_loc_id(Headers),
+    %io:format("POST Location: ~p~n", [Location]),
     true = uuid:is_v4(uuid:string_to_uuid(Id)),
     %% create with same login_id a second time
     {303, Headers2, _} = 'POST'("/api0/v1/users", BodyIn),
-    #{"location" := Location2} = Headers2,
+    #{"location" := Location} = Headers2,
     IdStr = binary_to_list(Id),
-    "/api0/v1/users/" ++ IdStr = Location2.
+    "/api0/v1/users/" ++ IdStr = Location.
 
 %% GET /api0/v1/users/ID | Read/CRUD
 test_GET_api0_v1_users_ID(Config) ->
     {ok, BodyIn} = read_file(Config, "create_test1.json"), 
     {201, Headers, _} = 'POST'("/api0/v1/users", BodyIn),
     {Location, Id} = get_loc_id(Headers),
-    io:format("GET Location: ~p~n", [Location]),
+    %io:format("GET Location: ~p~n", [Location]),
     {200, _, JSONOut} = 'GET'(Location),
-    io:format("Id: ~p~n GET JSONOut: ~p~n", [Id, JSONOut]),
+    %io:format("Id: ~p~n GET JSONOut: ~p~n", [Id, JSONOut]),
     #{<<"success">> := true, 
       <<"id">> := Id, 
       <<"login_id">> := <<"user1@company.com">>,
@@ -66,13 +66,21 @@ test_GET_api0_v1_users_ID(Config) ->
 test_PUT_api0_v1_users_ID(Config) ->
     {ok, BodyIn} = read_file(Config, "create_test2.json"), 
     {201, Headers, _} = 'POST'("/api0/v1/users", BodyIn),
-    {Location, _} = get_loc_id(Headers),
+    {Location, Id} = get_loc_id(Headers),
     io:format("GET Location: ~p~n", [Location]),
     OldUser = json_decode(BodyIn),
-    NewUser = OldUser#{<<"more">> => #{ <<"state">> => <<"new york">>}},
+    NewUser = OldUser#{<<"more">> => #{ <<"state">> => <<"new york">>, <<"firstname">> => <<"sarah">>}},
     BodyIn2 = json_encode(NewUser),
     io:format("BodyIn ~p~n BodyIn2 ~p~n", [BodyIn, BodyIn2]),
-    {204, _, _} = 'PUT'(Location, BodyIn2).
+    {204, _, _} = 'PUT'(Location, BodyIn2),
+    {200, _, JSONOut} = 'GET'(Location),
+    #{<<"success">> := true, 
+      <<"id">> := Id, 
+      <<"login_id">> := <<"user2@apple.com">>,
+      <<"login_type">> := <<"email">>,
+      <<"more">> := #{<<"state">> := <<"new york">>,
+                      <<"firstname">> := <<"sarah">>, 
+                      <<"salary">> := 6600}} = JSONOut.
 
 %%====================================================================
 %% Internal functions
