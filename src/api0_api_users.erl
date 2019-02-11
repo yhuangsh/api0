@@ -6,6 +6,8 @@
 
 -export([init/2,
          allowed_methods/2,
+         is_authorized/2,
+         forbidden/2,
          resource_exists/2,
          content_types_provided/2,
          content_types_accepted/2,
@@ -23,9 +25,14 @@
 init(R, S) -> 
     Method = cowboy_req:method(R),
     PathList = cowboy_req:path_info(R),
-    {cowboy_rest, R, S#{method => Method, path_list => PathList}}.
+    ContextBin = cowboy_req:parse_header(<<"x-agw-context">>, R, undefined),
+    Context = parse_context(ContextBin),
+    {cowboy_rest, R, S#{method => Method, path_list => PathList, context => Context}}.
 
 allowed_methods(R, S) -> {[<<"GET">>, <<"POST">>, <<"DELETE">>, <<"PUT">>], R, S}.
+
+is_authorized(R, S = #{context := C}) -> is_authorized(C, R, S).
+forbidden(R, S = #{method := M, path_list := PL, context := C}) -> forbidden(M, PL, C, R, S).
 
 content_types_provided(R, S) -> {[{?CT_JSON, json_providers}], R, S}.
 content_types_accepted(R, S) -> {[{?CT_JSON, json_acceptors}], R, S}.
@@ -37,6 +44,38 @@ delete_resource(R, S) -> 'DELETE /api0/v1/users/ID'(R, S).
 %%====================================================================
 %% Internal functions
 %%====================================================================
+
+%% parse api gateway context
+%% in format: a=b;c=d;...;last_k=last_v
+%% out: #{a => b, c => d, ..., last_k => last_v
+%% where a, c, last_k converted into atoms while b, d, last_v stay unchanged as binary 
+parse_context(B) ->
+    ParamList = string:split(B, ";"),
+    ParamPropList = 
+        lists:map(
+            fun(E) -> 
+                [K, V] = string:split(E, "="), 
+                {binary_to_atom(K, latin1),  V} 
+            end, 
+            ParamList),
+    maps:from_list(ParamPropList).
+
+%% Not authorized if Context is undefined
+is_authorized(undefined, R, S) -> {{false, 'www-authenticate'()}, R, S};
+is_authorized(_, R, S) -> {true, R, S}.
+
+'www-authenticate'() -> <<"Bearer realm=\"api0\"">>.
+
+%% Forbidden 
+forbidden(<<"GET">>, [_], #{scope := Scope}, R, S) -> {not_admin(Scope), R, S};
+forbidden(<<"GET">>, [Id1], #{user_id := Id2}, R, S) -> {not_owner(Id1, Id2), R, S}; 
+forbidden(<<"POST">>, [], #{scope := Scope}, R, S) -> {not_admin(Scope), R, S}; 
+forbidden(<<"PUT">>, [Id1], #{user_id := Id2}, R, S) -> {not_owner(Id1, Id2), R, S};
+forbidden(<<"DELETE">>, [_], #{scope := Scope}, R, S) -> {not_admin(Scope), R, S};
+forbidden(_, _, _, R, S) -> {false, R, S}.
+
+not_admin(Scope) -> Scope =/= <<"admin">>.
+not_owner(TargetId, SourceId) -> TargetId =/= SourceId.
 
 %% Resource Existence
 resource_exists(<<"GET">>, [Id], R, S) -> 
@@ -64,9 +103,9 @@ resource_exists(_, _, R, S) ->
     set_resource([], [], R, S).
 
 set_resource([], NewUsers, R, S) when is_list(NewUsers) -> 
-    {false, R, S#{api0_old_users => [], api0_new_users => NewUsers}};
+    {false, R, S#{old_user => [], new_user => NewUsers}};
 set_resource(OldUsers, NewUsers, R, S) when is_list(OldUsers) andalso is_list(NewUsers) -> 
-    {true, R, S#{api0_old_users => OldUsers, api0_new_users => NewUsers}}.
+    {true, R, S#{old_user => OldUsers, new_user => NewUsers}}.
 
 %% Providers 
 json_acceptors(R, S = #{method := M, path_list := PL}) -> json_acceptors(M, PL, R, S).
@@ -77,22 +116,22 @@ json_providers(R, S = #{method := M, path_list := PL}) -> json_providers(M, PL, 
 json_providers(<<"GET">>, [_Id], R, S) -> 'GET /api0/v1/users/ID'(R, S).
 
 %% Create/CRUD
-'POST /api0/v1/users'(R, S = #{api0_old_users := [U], api0_new_users := _}) -> {{true, mk_resource_url(U)}, R, S}; 
-'POST /api0/v1/users'(R, S = #{api0_old_users := [], api0_new_users := [undefined]}) -> {false, R, S};
-'POST /api0/v1/users'(R, S = #{api0_old_users := [], api0_new_users := [U]}) -> 
+'POST /api0/v1/users'(R, S = #{old_user := [U], new_user := _}) -> {{true, mk_resource_url(U)}, R, S}; 
+'POST /api0/v1/users'(R, S = #{old_user := [], new_user := [undefined]}) -> {false, R, S};
+'POST /api0/v1/users'(R, S = #{old_user := [], new_user := [U]}) -> 
     {atomic, ok} = tab_user:create(U),
     {{true, mk_resource_url(U)}, R, S}.
 
 mk_resource_url(#{<<"id">> := Id}) -> <<<<"/api0/v1/users/">>/binary, Id/binary>>.
 
 %% Read/CRUD
-'GET /api0/v1/users/ID'(R, S = #{api0_old_users := [OldUser], api0_new_users := []}) ->
+'GET /api0/v1/users/ID'(R, S = #{old_user := [OldUser], new_user := []}) ->
     {jsx:encode(maps:merge(#{<<"success">> => true}, OldUser)), R, S}.
 
 %% Update/CRUD
-'PUT /api0/v1/users/ID'(R, S = #{api0_old_users := [], api0_new_users := _}) -> {false, R, S};
-'PUT /api0/v1/users/ID'(R, S = #{api0_old_users := _, api0_new_users := []}) -> {false, R, S};
-'PUT /api0/v1/users/ID'(R, S = #{api0_old_users := [OldUser], api0_new_users := [NewUser]}) -> 
+'PUT /api0/v1/users/ID'(R, S = #{old_user := [], new_user := _}) -> {false, R, S};
+'PUT /api0/v1/users/ID'(R, S = #{old_user := _, new_user := []}) -> {false, R, S};
+'PUT /api0/v1/users/ID'(R, S = #{old_user := [OldUser], new_user := [NewUser]}) -> 
     case tab_user:is_mergeable(NewUser) of
         false -> {false, R, S};
         true ->
@@ -102,8 +141,20 @@ mk_resource_url(#{<<"id">> := Id}) -> <<<<"/api0/v1/users/">>/binary, Id/binary>
     end.
 
 %% Delete/CRUD
-'DELETE /api0/v1/users/ID'(R, S = #{api0_old_users := [OldUser], api0_new_users := []}) -> 
+'DELETE /api0/v1/users/ID'(R, S = #{old_user := [OldUser], new_user := []}) -> 
     #{<<"id">> := Id} = OldUser,
     {atomic, ok} = tab_user:delete(Id),
     {true, R, S}.
-    
+
+%%====================================================================
+%% Unit tests
+%%====================================================================
+
+
+-ifdef(TEST).
+
+parse_context_test() ->
+    C1 = <<"k1=v1;k2=v2">>,
+    ?assertEqual(#{k1 => <<"v1">>, k2 => <<"v2">>}, C1).
+
+-endif.
