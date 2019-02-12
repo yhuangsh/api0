@@ -6,6 +6,7 @@
 
 -export([init/2,
          allowed_methods/2,
+         malformed_request/2,
          is_authorized/2,
          forbidden/2,
          resource_exists/2,
@@ -25,13 +26,16 @@
 init(R, S) -> 
     Method = cowboy_req:method(R),
     PathList = cowboy_req:path_info(R),
-    ContextBin = cowboy_req:parse_header(<<"x-agw-context">>, R, undefined),
-    Context = parse_context(ContextBin),
+    Context = cowboy_req:header(<<"x-agw-context">>, R, undefined),
+    %io:format("api_user:init M = ~p~n, PL = ~p~n, C = ~p~n", [Method, PathList, Context]),
     {cowboy_rest, R, S#{method => Method, path_list => PathList, context => Context}}.
 
 allowed_methods(R, S) -> {[<<"GET">>, <<"POST">>, <<"DELETE">>, <<"PUT">>], R, S}.
 
+malformed_request(R, S = #{method := M, path_list := PL}) -> malformed_request(M, PL, R, S).
+
 is_authorized(R, S = #{context := C}) -> is_authorized(C, R, S).
+
 forbidden(R, S = #{method := M, path_list := PL, context := C}) -> forbidden(M, PL, C, R, S).
 
 content_types_provided(R, S) -> {[{?CT_JSON, json_providers}], R, S}.
@@ -60,17 +64,21 @@ parse_context(B) ->
             ParamList),
     maps:from_list(ParamPropList).
 
+malformed_request(<<"GET">>, [], R, S) -> {tre, R, S};
+malformed_request(_, _, R, S) -> {false, R, S}.
+
 %% Not authorized if Context is undefined
 is_authorized(undefined, R, S) -> {{false, 'www-authenticate'()}, R, S};
-is_authorized(_, R, S) -> {true, R, S}.
+is_authorized(C, R, S) -> {true, R, S#{context => parse_context(C)}}.
 
 'www-authenticate'() -> <<"Bearer realm=\"api0\"">>.
 
 %% Forbidden 
-forbidden(<<"GET">>, [_], #{scope := Scope}, R, S) -> {not_admin(Scope), R, S};
-forbidden(<<"GET">>, [Id1], #{user_id := Id2}, R, S) -> {not_owner(Id1, Id2), R, S}; 
+forbidden(<<"GET">>, [Id1], #{user_id := Id2, scope := Scope}, R, S) -> 
+    {not_admin(Scope) andalso not_owner(Id1, Id2), R, S}; 
 forbidden(<<"POST">>, [], #{scope := Scope}, R, S) -> {not_admin(Scope), R, S}; 
-forbidden(<<"PUT">>, [Id1], #{user_id := Id2}, R, S) -> {not_owner(Id1, Id2), R, S};
+forbidden(<<"PUT">>, [Id1], #{user_id := Id2, scope := Scope}, R, S) -> 
+    {not_admin(Scope) andalso not_owner(Id1, Id2), R, S};
 forbidden(<<"DELETE">>, [_], #{scope := Scope}, R, S) -> {not_admin(Scope), R, S};
 forbidden(_, _, _, R, S) -> {false, R, S}.
 
@@ -107,11 +115,11 @@ set_resource([], NewUsers, R, S) when is_list(NewUsers) ->
 set_resource(OldUsers, NewUsers, R, S) when is_list(OldUsers) andalso is_list(NewUsers) -> 
     {true, R, S#{old_user => OldUsers, new_user => NewUsers}}.
 
-%% Providers 
+%% Acceptors
 json_acceptors(R, S = #{method := M, path_list := PL}) -> json_acceptors(M, PL, R, S).
 json_acceptors(<<"POST">>, [], R, S) -> 'POST /api0/v1/users'(R, S);
 json_acceptors(<<"PUT">>, [_Id], R, S) -> 'PUT /api0/v1/users/ID'(R, S).
-%% Acceptors
+%% Providers 
 json_providers(R, S = #{method := M, path_list := PL}) -> json_providers(M, PL, R, S).
 json_providers(<<"GET">>, [_Id], R, S) -> 'GET /api0/v1/users/ID'(R, S).
 
@@ -154,7 +162,7 @@ mk_resource_url(#{<<"id">> := Id}) -> <<<<"/api0/v1/users/">>/binary, Id/binary>
 -ifdef(TEST).
 
 parse_context_test() ->
-    C1 = <<"k1=v1;k2=v2">>,
+    C1 = parse_context(<<"k1=v1;k2=v2">>),
     ?assertEqual(#{k1 => <<"v1">>, k2 => <<"v2">>}, C1).
 
 -endif.
