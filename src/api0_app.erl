@@ -74,8 +74,10 @@ start_cowboy(S) ->
 routes(S) -> [route0(S)].
 route0(S) -> {'_', [{prefix("/probes/:pb"), api0_probes, S},
                     {prefix("/v1/info/[...]"), api0_api_info, S},
-                    {prefix("/v1/users/[...]"), api0_api_users, S},
-                    {'_', api0_api_404, []}]}.                
+                    % /v1/users will trigger below handler, but will NOT the content_provided handler
+                    % use malformed_request to return 400 bad request
+                    {prefix("/v1/users/[...]"), api0_api_users, S}, 
+                    {'_', api0_bad_request, []}]}.                
 
 prefix(Path) -> application:get_env(api0, prefix, "") ++ Path.
 
